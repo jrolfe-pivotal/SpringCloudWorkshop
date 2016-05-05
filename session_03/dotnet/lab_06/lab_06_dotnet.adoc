@@ -333,7 +333,7 @@ usage: 1G x 1 instances
 urls: bookservice12.pcf14.cloud.fe.pivotal.io
 last uploaded: Mon Mar 7 17:33:29 UTC 2016
 stack: windows2012R2
-buildpack: https://github.com/ryandotsmith/null-buildpack.git
+buildpack: binary_buildpack
 
      state     since                    cpu    memory       disk          details
 #0   running   2016-03-07 12:34:43 PM   0.0%   311M of 1G   23.3M of 1G
