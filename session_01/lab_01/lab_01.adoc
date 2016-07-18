@@ -53,7 +53,7 @@ Finally, change back to the development space and delete the space you created p
 ----
 $ cf target -s development
 $ cf delete-space [the-name-you-used-for-your-new-space-above]
-
+----
 
 == Build and Push!
 
