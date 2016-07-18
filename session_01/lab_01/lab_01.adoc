@@ -24,7 +24,7 @@ Follow the prompts, choosing the development space.
 
 == Creating and Using Spaces
 
-. For the purposes of this workshop, you have your own org, which is the top level of a logical environment.  Orgs contain spaces, and spaces contain apps and services.  You can create new spaces to logically separate your applications and services.  Try creating a new one:
+. Logical environments in CloudFoundry are made up of orgs and spaces.  For the purposes of this workshop, you have your own org, which is the top level of a logical environment.  Orgs contain spaces, and spaces contain apps and services.  You can create new spaces to logically separate your applications and services.  Try creating a new one:
 +
 ----
 $ cf create-space [name-your-space]
@@ -35,6 +35,14 @@ Then list the spaces that are accessible to you within your org by typing:
 ----
 $ cf spaces
 ----
++
+You can get more information about a particular space by using this command:
++
+----
+$ cf space [the-name-of-a-space]
+----
++
+Notice that domains can be scoped to a space, a space can have its own security group (think egress firewall rules), and a space can have its own quota that defines how much resource applications within it are allowed to consume.  
 +
 You will often need to check which logical environment you are targeting.  Do so with this command:
 +
