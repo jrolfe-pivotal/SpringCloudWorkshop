@@ -82,7 +82,7 @@ The Gradle Wrapper will automatically download the appropriate version of Gradle
 . Push the application!
 +
 ----
-$ cf push
+$ cf push -n music-XX  // (Replace X with something unique - like your name - so that PCF will create a unique route)
 ----
 +
 You should see output similar to the following listing. Take a look at the listing callouts for a play-by-play of what's happening:
