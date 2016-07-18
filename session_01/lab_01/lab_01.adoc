@@ -22,6 +22,38 @@ Follow the prompts, choosing the development space.
 
 . Throughout the labs, you will see reference to the Pivotal Cloud Foundry Apps Manager.  This user interface to Cloud Foundry makes it much easier to visualize what applications you are running, scale them, view their logs, bind services, etc.  You can access this UI at any time by opening https://apps.your-domain in a browser (replace the your-domain portion of this hostname with the appropriate value for the host you've been assigned) and logging in with your username and password.  It may be helpful to bookmark this URL for the duration of the workshop.
 
+== Creating and Using Spaces
+
+. For the purposes of this workshop, you have your own org, which is the top level of a logical environment.  Orgs contain spaces, and spaces contain apps and services.  You can create new spaces to logically separate your applications and services.  Try creating a new one:
++
+----
+$ cf create-space [name-your-space]
+----
++
+Then list the spaces that are accessible to you within your org by typing:
++
+----
+$ cf spaces
+----
++
+You will often need to check which logical environment you are targeting.  Do so with this command:
++
+----
+$ cf target
+----
++
+And finally, you may wish to change which space you are targeting.  Target the space you created before:
++
+----
+$ cf target -s [the-name-you-used-for-your-new-space-above]
+----
++
+Finally, change back to the development space and delete the space you created previously:
++
+----
+$ cf target -s development
+$ cf delete-space [the-name-you-used-for-your-new-space-above]
+
 
 == Build and Push!
 
