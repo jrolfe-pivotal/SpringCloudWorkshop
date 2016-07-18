@@ -47,6 +47,8 @@ image::/../../Common/images/PWS_Marketplace.png[]
 
 == Creating and Binding to a Service Instance
 
+While you can create a new service instance and bind it to your application from the Apps Manager, let's be command line nerds, and see exactly what's going on command by command.
++
 . Let's begin by creating a MySQL instance.
 From the CLI, let's _create_ a developer instance:
 +
