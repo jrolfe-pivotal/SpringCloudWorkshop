@@ -104,8 +104,9 @@ System-Provided:
  }
 }
 ----
-<1> `VCAP_SERVICES` is a special Cloud Foundry environment variable that contains a JSON document containing all of the information for any services bound to an application.
+<1> `VCAP_SERVICES` is a special Cloud Foundry environment variable that contains a JSON document containing all of the information for any services bound to an application.  This information can be used by application code to connect to and interact with the bound service, and there are many frameworks, depending on your language choice, that understands this information.  Spring Cloud Connectors, for example, can autowire services to dependent beans within your application to create, for example a JDBC Data Source.
 <2> Notice here the unique URI for this instance of MySQL that `spring-music` has been bound to.
+<3> Note also that a unique set of credentials has been created for this application to use when connecting to this service.  Generating and protecting application unique keys for a service increases security and auditability, and is common practice for Cloud Foundry service brokers (the components that handle the provisioning of service instances).
 ====
 
 . Now let's _restage_ the application, which cycles our application back through the staging/buildpack process before redeploying the application.footnote:[In this case, we could accomplish the same goal by only _restarting_ the application via `cf restart spring-music`.
@@ -121,7 +122,7 @@ image::/../../Common/images/Spring_Music_PGSQL.png[]
 +
 As you can see from the information dialog, the application is now utilizing a MySQL database via the `spring-music-db` service.
 +
-Note that you can do all of this from the Application Manager UI as well, by going to the Marketplace mentioned above, selecting your desired service, creating an instance of it, and binding it to your spring-music application.
+Note again that you can do all of this from the Application Manager UI as well, by going to the Marketplace mentioned above, selecting your desired service, creating an instance of it, and binding it to your spring-music application.
 
 == Clean Up
 
