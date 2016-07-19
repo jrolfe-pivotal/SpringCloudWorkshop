@@ -34,6 +34,12 @@ compile ("org.springframework.boot:spring-boot-starter-jersey:${springBootVersio
 	}
 ----
 +
+. In the `:provider-catalog` project, add a reference to the hadoop-tools jar file, e.g.
++
+----
+compile files('/path/to/hadoop-tools-0.9.1-SNAPSHOT.jar')
+----
++
 . In the `:provider-catalog` project, add the following line to indicate that embedded tomcat is not needed.
 +
 [source,java]
