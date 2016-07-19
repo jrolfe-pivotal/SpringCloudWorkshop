@@ -72,3 +72,52 @@ public class ProviderCatalogApplication extends SpringBootServletInitializer {
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.context.web.SpringBootServletInitializer;
 ----
++
+. Point the application at the Elastic Search cluster running in your instance by editing `modules/catalog/src/main/resources/settings.properties`
++
+----
+elasticsearch {
+	host =		'10.0.16.213'
+	port =		9300
+	cluster = 	'Cluster'
+	shield {
+		user =		'user'
+		password =	'password'
+	}
+}
+----
++
+. Build the project from the root directory
++
+----
+gradle build
+----
++
+. Go to the build directory
++
+----
+cd modules/catalog/build/libs
+----
++
+. Push the application to your space (make sure you're targetting the correct space using `cf target`)
++
+----
+cf push provider-catalog-XX -p provider-catalog.war  // Provide a unique value for XX
+----
++
+. From a browser, validate that the application is working using these URLs (sub in your unique value for XX in the URLs)
++
+----
+http://provider-catalog-XX.app.40.77.69.4.cf.pcfazure.com/webjars/swagger-ui/2.1.4/index.html?url=%2Fcatalog%2F_%2Fswagger.json#/catalog
+----
++
+----
+http://provider-catalog-XX.app.40.77.69.4.cf.pcfazure.com/catalog/catalogs/m/list/100/query?query=glove&from=0&size=10&sort=-mfr_full%2C%2Bid_mck&category=M
+----
++
+. Finally, once you're done, delete your app
++
+----
+cf d provider-catalog-XX
+----
+----
