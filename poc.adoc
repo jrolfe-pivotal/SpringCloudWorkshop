@@ -8,16 +8,18 @@
 . Change springBootVersion
 +
 ----
-springBootVersion = "1.3.5.RELEASE"  ===>  springBootVersion = "1.3.6.RELEASE"
+springBootVersion = "1.3.6.RELEASE" 
 ----
 +
 ----
-$ cf api --skip-ssl-validation https://api.[your-domain]
-----
-
-. Login to Pivotal Cloud Foundry:
-+
-----
-$ cf login
+classpath 'org.springframework.boot:spring-boot-gradle-plugin:1.3.6.RELEASE'
 ----
 +
+. To avoid logging library conflicts, exclude `logback-classic` from the `spring-boot-gradle-plugin`, `spring-boot-starter-web`, `spring-boot-starter-actuator`, and `spring-boot-starter-jersey` dependencies (the last is in the `:provider-core` project), e.g.
++
+[source,java]
+----
+compile ("org.springframework.boot:spring-boot-starter-jersey:${springBootVersion}") {
+    exclude module: "logback-classic"
+}
+----
