@@ -314,3 +314,9 @@ Really delete the service cf-scale-boot-logs?> y
 Deleting service cf-scale-boot-logs in org oreilly-class / space instructor as mstine@pivotal.io...
 OK
 ----
++
+----
+$ cf services //to remind yourself of your autoscaler's name
+$ cf ds [the-name-of-your-autoscaling-instance]  
+----
+
