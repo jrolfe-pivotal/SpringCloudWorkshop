@@ -1,0 +1,23 @@
+= Instructions for Pushing Catalog App
+
+== Prepare the POC code
+
+. Unzip the poc code to a working diretory
+. Unzip the com..provider zip
+. Open build.gradle
+. Change springBootVersion
++
+----
+springBootVersion = "1.3.5.RELEASE"  ===>  springBootVersion = "1.3.6.RELEASE"
+----
++
+----
+$ cf api --skip-ssl-validation https://api.[your-domain]
+----
+
+. Login to Pivotal Cloud Foundry:
++
+----
+$ cf login
+----
++
