@@ -23,3 +23,46 @@ compile ("org.springframework.boot:spring-boot-starter-jersey:${springBootVersio
     exclude module: "logback-classic"
 }
 ----
++
+. In the `:provider-catalog` project, uncomment the `apply plugin: 'war'` instruction
+. In the `:provider-catalog` project, set the Spring Boot main class:
++
+[source,java]
+----
+	bootRepackage {
+		mainClass = "com.mckesson.pt.catalog.ProviderCatalogApplication"
+	}
+----
++
+. In the `:provider-catalog` project, add the following line to indicate that embedded tomcat is not needed.
++
+[source,java]
+----
+providedRuntime("org.springframework.boot:spring-boot-starter-tomcat")
+----
++
+. In the catalog module, edit `com.mckesson.pt.catalog.ProviderCatalogApplication`
+. First, extend `SpringBootServletInitializer`, e.g.:
++
+[source,java]
+----
+public class ProviderCatalogApplication extends SpringBootServletInitializer {
+----
++
+. And then, override the configure method:
++
+[source,java]
+----
+    @Override
+    protected SpringApplicationBuilder configure(SpringApplicationBuilder application) {
+        return application.sources(ProviderCatalogApplication.class);
+    }
+----
++
+. Add imports as necessary
++
+[source,java]
+----
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.boot.context.web.SpringBootServletInitializer;
+----
