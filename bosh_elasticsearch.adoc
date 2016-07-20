@@ -1,5 +1,7 @@
 = Instructions for Pushing Catalog App
 
+In this lab, we will recreate the ElasticSearch bosh release I deployed into your environment.  Note that this is a non-trivial BOSH release, and so is more complex than I might otherwise choose for a lab like this.  
+
 == Prerequisites
 
 https://bosh.io/docs/bosh-cli.html
@@ -17,6 +19,7 @@ Release directory initialized
 . Download the java 8 binary, http://www.linuxfromscratch.org/blfs/view/svn/general/java.html. These instructions assume that binary is named OpenJDK-1.8.0.92-x86_64-bin.tar.xz
 . Download the Elasticsearch binary, https://www.elastic.co/downloads/past-releases/elasticsearch-1-7-3 (zip).  These instructions assume that binary is named elasticsearch-1.7.3.zip
 . cd into the elasticsearch-boshrelease directory
+. Create the subdirectories `blobs/java8` and `blobs/elasticsearch17` and copy the downloaded binaries into these directories (jdk into java8, elasticsearch into elasticsearch17)
 . Generate the java8 and elastic search bosh package skeletons
 +
 ----
@@ -184,9 +187,7 @@ check process elasticsearch
   group vcap
 ----
 +
-. Edit the elasticsearch17 job's spec file
-
-Note that this spec file is more complex than might be necessary for a example lab, as I was trying to build a semi-real elasticsearch deployment.  It includes many property definitions to allow for a slightly more sophisticated ability to customize the elasticsearch deployment.
+. Edit the elasticsearch17 job's spec file.  Note that this spec file is more complex than might be necessary for a example lab, as I was trying to build a semi-real elasticsearch deployment.  It includes many property definitions to allow for a slightly more sophisticated ability to customize the elasticsearch deployment.
 +
 ----
 ---
@@ -291,9 +292,294 @@ appender:
 
 <% if_p('elasticsearch.logging_options') do | v | %><%= v %><% end %>
 ----
++ 
+. In our install of elasticsearch, we want to enable customization of synonyms and dimensions.  To do this, add the custom/catalog subdirectory to the config directory, and copy your synonyms.txt and dimensions.txt files to it.
+. Finally, there are a few common utility scripts that I'm leveraging which need to be created. These utility scripts set environment variables, paths, java_home, etc. From the templates directory, create a subdirectory called `data` and add a file called properties.sh.erb with this content:
++
+----
+#!/usr/bin/env bash
 
+# job template binding variables
 
+# job name & index of this VM within cluster
+# e.g. JOB_NAME=redis, JOB_INDEX=0
+export NAME='<%= name %>'
+export JOB_INDEX=<%= index %>
+# full job name, like redis/0 or webapp/3
+export JOB_FULL="$NAME/$JOB_INDEX"
+----
++ 
+. And then, from the templates directory, create another subdirectory called `helpers` - it will have two files, the first called `ctl_setup.sh` with this content:
++
+----
+#!/usr/bin/env bash
 
-Note that because this was built to be a somewhat "real" release vs. just a lab, that 
-this job is more complex than might be necessary for simple install of Elasticsearch.  
+# Setup env vars and folders for the ctl script
+# This helps keep the ctl script as readable
+# as possible
+
+# Usage options:
+# source /var/vcap/jobs/foobar/helpers/ctl_setup.sh JOB_NAME OUTPUT_LABEL
+# source /var/vcap/jobs/foobar/helpers/ctl_setup.sh foobar
+# source /var/vcap/jobs/foobar/helpers/ctl_setup.sh foobar foobar
+# source /var/vcap/jobs/foobar/helpers/ctl_setup.sh foobar nginx
+
+set -e # exit immediately if a simple command exits with a non-zero status
+set -u # report the usage of uninitialized variables
+
+JOB_NAME=$1
+output_label=${1:-JOB_NAME}
+
+export JOB_DIR=/var/vcap/jobs/$JOB_NAME
+chmod 755 $JOB_DIR # to access file via symlink
+
+# Load some bosh deployment properties into env vars
+# Try to put all ERb into data/properties.sh.erb
+# incl $NAME, $JOB_INDEX, $WEBAPP_DIR
+source $JOB_DIR/data/properties.sh
+
+source $JOB_DIR/helpers/ctl_utils.sh
+redirect_output ${output_label}
+
+export HOME=${HOME:-/home/vcap}
+
+# Add all packages' /bin & /sbin into $PATH
+for package_bin_dir in $(ls -d /var/vcap/packages/*/*bin)
+do
+  export PATH=${package_bin_dir}:$PATH
+done
+
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-''} # default to empty
+for package_bin_dir in $(ls -d /var/vcap/packages/*/lib)
+do
+  export LD_LIBRARY_PATH=${package_bin_dir}:$LD_LIBRARY_PATH
+done
+
+# Setup log, run and tmp folders
+
+export RUN_DIR=/var/vcap/sys/run/$JOB_NAME
+export LOG_DIR=/var/vcap/sys/log/$JOB_NAME
+export TMP_DIR=/var/vcap/sys/tmp/$JOB_NAME
+export STORE_DIR=/var/vcap/store/$JOB_NAME
+for dir in $RUN_DIR $LOG_DIR $TMP_DIR $STORE_DIR
+do
+  mkdir -p ${dir}
+  chown vcap:vcap ${dir}
+  chmod 775 ${dir}
+done
+export TMPDIR=$TMP_DIR
+
+export C_INCLUDE_PATH=/var/vcap/packages/mysqlclient/include/mysql:/var/vcap/packages/sqlite/include:/var/vcap/packages/libpq/include
+export LIBRARY_PATH=/var/vcap/packages/mysqlclient/lib/mysql:/var/vcap/packages/sqlite/lib:/var/vcap/packages/libpq/lib
+
+# consistent place for vendoring python libraries within package
+if [[ -d ${WEBAPP_DIR:-/xxxx} ]]
+then
+  export PYTHONPATH=$WEBAPP_DIR/vendor/lib/python
+fi
+
+if [[ -d /var/vcap/packages/java8 ]]
+then
+  export JAVA_HOME="/var/vcap/packages/java8"
+fi
+
+export PIDFILE=$RUN_DIR/$JOB_NAME.pid
+
+echo '$PATH' $PATH
+----
++
+. And the second called `ctl_utils.sh` with this content
++
+----
+# Helper functions used by ctl scripts
+
+# links a job file (probably a config file) into a package
+# Example usage:
+# link_job_file_to_package config/redis.yml [config/redis.yml]
+# link_job_file_to_package config/wp-config.php wp-config.php
+link_job_file_to_package() {
+  source_job_file=$1
+  target_package_file=${2:-$source_job_file}
+  full_package_file=$WEBAPP_DIR/${target_package_file}
+
+  link_job_file ${source_job_file} ${full_package_file}
+}
+
+# links a job file (probably a config file) somewhere
+# Example usage:
+# link_job_file config/bashrc /home/vcap/.bashrc
+link_job_file() {
+  source_job_file=$1
+  target_file=$2
+  full_job_file=$JOB_DIR/${source_job_file}
+
+  echo link_job_file ${full_job_file} ${target_file}
+  if [[ ! -f ${full_job_file} ]]
+  then
+    echo "file to link ${full_job_file} does not exist"
+  else
+    # Create/recreate the symlink to current job file
+    # If another process is using the file, it won't be
+    # deleted, so don't attempt to create the symlink
+    mkdir -p $(dirname ${target_file})
+    ln -nfs ${full_job_file} ${target_file}
+  fi
+}
+
+# If loaded within monit ctl scripts then pipe output
+# If loaded from 'source ../utils.sh' then normal STDOUT
+redirect_output() {
+  SCRIPT=$1
+  mkdir -p /var/vcap/sys/log/monit
+  exec 1>> /var/vcap/sys/log/monit/$SCRIPT.log
+  exec 2>> /var/vcap/sys/log/monit/$SCRIPT.err.log
+}
+
+function pid_is_running() {
+  declare pid="$1"
+  ps -p "${pid}" >/dev/null 2>&1
+}
+
+# pid_guard
+#
+# @param pidfile
+# @param name [String] an arbitrary name that might show up in STDOUT on errors
+#
+# Run this before attempting to start new processes that may use the same :pidfile:.
+# If an old process is running on the pid found in the :pidfile:, exit 1. Otherwise,
+# remove the stale :pidfile: if it exists.
+#
+function pid_guard() {
+  declare pidfile="$1" name="$2"
+
+  echo "------------ STARTING $(basename "$0") at $(date) --------------" | tee /dev/stderr
+
+  if [ ! -f "${pidfile}" ]; then
+    return 0
+  fi
+
+  local pid
+  pid=$(head -1 "${pidfile}")
+
+  if pid_is_running "${pid}"; then
+    echo "${name} is already running, please stop it first"
+    exit 1
+  fi
+
+  echo "Removing stale pidfile"
+  rm "${pidfile}"
+}
+
+# wait_pid_death
+#
+# @param pid
+# @param timeout
+#
+# Watch a :pid: for :timeout: seconds, waiting for it to die.
+# If it dies before :timeout:, exit 0. If not, exit 1.
+#
+# Note that this should be run in a subshell, so that the current
+# shell does not exit.
+#
+function wait_pid_death() {
+  declare pid="$1" timeout="$2"
+
+  local countdown
+  countdown=$(( timeout * 10 ))
+
+  while true; do
+    if ! pid_is_running "${pid}"; then
+      return 0
+    fi
+
+    if [ ${countdown} -le 0 ]; then
+      return 1
+    fi
+
+    countdown=$(( countdown - 1 ))
+    sleep 0.1
+  done
+}
+
+# kill_and_wait
+#
+# @param pidfile
+# @param timeout [default 25s]
+#
+# For a pid found in :pidfile:, send a `kill -15` TERM, then wait for :timeout: seconds to
+# see if it dies on its own. If not, send it a `kill -9`. If the process does die,
+# exit 0 and remove the :pidfile:. If after all of this, the process does not actually
+# die, exit 1.
+#
+# Note:
+# Monit default timeout for start/stop is 30s
+# Append 'with timeout {n} seconds' to monit start/stop program configs
+#
+function kill_and_wait() {
+  declare pidfile="$1" timeout="${2:-25}" sigkill_on_timeout="${3:-1}"
+
+  if [ ! -f "${pidfile}" ]; then
+    echo "Pidfile ${pidfile} doesn't exist"
+    exit 0
+  fi
+
+  local pid
+  pid=$(head -1 "${pidfile}")
+
+  if [ -z "${pid}" ]; then
+    echo "Unable to get pid from ${pidfile}"
+    exit 1
+  fi
+
+  if ! pid_is_running "${pid}"; then
+    echo "Process ${pid} is not running"
+    rm -f "${pidfile}"
+    exit 0
+  fi
+
+  echo "Killing ${pidfile}: ${pid} "
+  kill "${pid}"
+
+  if ! wait_pid_death "${pid}" "${timeout}"; then
+    if [ "${sigkill_on_timeout}" = "1" ]; then
+      echo "Kill timed out, using kill -9 on ${pid}"
+      kill -9 "${pid}"
+      sleep 0.5
+    fi
+  fi
+
+  if pid_is_running "${pid}"; then
+    echo "Timed Out"
+    exit 1
+  else
+    echo "Stopped"
+    rm -f "${pidfile}"
+  fi
+}
+
+check_nfs_mount() {
+  opts=$1
+  exports=$2
+  mount_point=$3
+
+  if grep -qs $mount_point /proc/mounts; then
+    echo "Found NFS mount $mount_point"
+  else
+    echo "Mounting NFS..."
+    mount $opts $exports $mount_point
+    if [ $? != 0 ]; then
+      echo "Cannot mount NFS from $exports to $mount_point, exiting..."
+      exit 1
+    fi
+  fi
+}
+----
++
+. OK.  We're done with the release.  Let's get it packaged and ready to go.
++
+----
+> bosh create release --force
+----
++
+. At this point, we would upload this release to our bosh director.  The lab will end here, and I will demonstrate what this looks like on your environment.
 
