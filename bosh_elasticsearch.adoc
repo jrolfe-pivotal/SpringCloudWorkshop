@@ -1,4 +1,4 @@
-= Instructions for Pushing Catalog App
+= BOSH ElasticSearch Lab
 
 In this lab, we will recreate the ElasticSearch bosh release I deployed into your environment.  Note that this is a non-trivial BOSH release, and so is more complex than I might otherwise choose for a lab like this.  
 
