@@ -1,0 +1,183 @@
+= Instructions for Pushing Catalog App
+
+== Prerequisites
+
+https://bosh.io/docs/bosh-cli.html
+
+== Create a new Bosh Release
+
+. Generate the release skeleton
++
+----
+> bosh init release elasticsearch-boshrelease
+
+Release directory initialized
+----
++
+. Download the java 8 binary, http://www.linuxfromscratch.org/blfs/view/svn/general/java.html. These instructions assume that binary is named OpenJDK-1.8.0.92-x86_64-bin.tar.xz
+. Download the Elasticsearch binary, https://www.elastic.co/downloads/past-releases/elasticsearch-1-7-3 (zip).  These instructions assume that binary is named elasticsearch-1.7.3.zip
+. cd into the elasticsearch-boshrelease directory
+. Generate the java8 and elastic search bosh package skeletons
++
+----
+> bosh generate package java8
+
+create	packages/java8
+create	packages/java8/packaging
+create	packages/java8/pre_packaging
+create	packages/java8/spec
+
+Generated skeleton for `java8' package in `packages/java8'
+
+> bosh generate package elasticsearch17
+
+create	packages/elasticsearch17
+create	packages/elasticsearch17/packaging
+create	packages/elasticsearch17/pre_packaging
+create	packages/elasticsearch17/spec
+
+Generated skeleton for `elasticsearch17' package in `packages/elasticsearch17'
+----
++
+. Edit the java8 package spec
++
+----
+---
+name: java8
+
+dependencies: []
+
+files:
+- java8/OpenJDK-1.8.0.92-x86_64-bin.tar.xz
+----
++
+. Create the packaging script for java8
+----
+# abort script on any command that exits with a non zero value
+set -e
+
+tar xfv $BOSH_COMPILE_TARGET/java8/OpenJDK-1.8.0.92-x86_64-bin.tar.xz
+cp -a OpenJDK-1.8.0.92-x86_64-bin/* $BOSH_INSTALL_TARGET
+----
++
+. Edit the elasticsearch17 package spec
++
+----
+---
+name: elasticsearch17
+
+dependencies: []
+
+files:
+- elasticsearch17/elasticsearch-1.7.3.zip
+----
++
+. Create the packaging script for elastic search
++
+----
+# abort script on any command that exits with a non zero value
+set -e
+
+unzip $BOSH_COMPILE_TARGET/elasticsearch17/elasticsearch-1.7.3.zip
+cp -a elasticsearch-1.7.3/* $BOSH_INSTALL_TARGET
+----
++
+. From the root directory of the bosh release, generate the elasticsearch job skeleton
++
+----
+> bosh generate job elasticsearch17
+----
++ 
+. Create the elasticsearch control script, named `elasticsearch_ctl` in the job's template/bin directory (you'll need to create `bin`)
++
+----
+#!/bin/bash
+
+set -e # exit immediately if a simple command exits with a non-zero status
+set -u # report the usage of uninitialized variables
+
+# Setup env vars and folders for the webapp_ctl script
+source /var/vcap/jobs/elasticsearch17/helpers/ctl_setup.sh 'elasticsearch17'
+
+export PORT=${PORT:-5000}
+export LANG=en_US.UTF-8
+
+<% p("elasticsearch.exec.environment", {}).each do | k, v | %>
+export <%= k %>=<%= v %>
+<% end %>
+
+<% if not p('elasticsearch.exec.environment', {}).has_key? 'ES_HEAP_SIZE' then %>
+export ES_HEAP_SIZE=$((( $( cat /proc/meminfo | grep MemTotal | awk '{ print $2 }' ) * 46 ) / 100 ))K
+<% end %>
+
+
+PLUGIN_SCRIPTS_DIR=/var/vcap/data/elasticsearch17/plugin-scripts
+
+case $1 in
+
+  start)
+    pid_guard $PIDFILE $JOB_NAME
+    pid_guard $PIDFILE-init $JOB_NAME-init
+
+    # lock while we update plugins and run drain
+    echo "$$" > "$PIDFILE-init"
+
+    mkdir -p /var/vcap/packages/elasticsearch17/plugins
+
+    # install plugins
+    rm -rf /var/vcap/packages/elasticsearch17/plugins/*
+
+    # install kopf as it is always packaged with the elasticsearch job
+    #/var/vcap/packages/elasticsearch/bin/plugin install file:///var/vcap/packages/elasticsearch-plugins-kopf/elasticsearch-kopf.zip
+
+    # install user defined plugins
+    <% p("elasticsearch.plugins").each do |plugin| _, path = plugin.first %>
+      <% if path.start_with? '/var/vcap' %>
+        /var/vcap/packages/elasticsearch17/bin/plugin install "file://<%= path %>"
+      <% else %>
+        /var/vcap/packages/elasticsearch17/bin/plugin install "<%= path %>"
+      <% end %>
+    <% end %>
+
+
+    ulimit -n 64000
+    ulimit -l unlimited  # required to enable elasticsearch's mlockall setting
+
+    mkdir -p $PLUGIN_SCRIPTS_DIR
+
+    # v21 switched to running as vcap; remove after a couple versions
+    chown -R vcap:vcap $STORE_DIR $LOG_DIR $RUN_DIR $PLUGIN_SCRIPTS_DIR
+
+    # ES2.0 deprcated -Des.config and insists on having the config file under ES_HOME/config
+    cp --remove-destination $JOB_DIR/config/elasticsearch.yml /var/vcap/packages/elasticsearch17/config
+
+    chpst -u vcap:vcap /var/vcap/packages/elasticsearch17/bin/elasticsearch \
+         -p ${PIDFILE} \
+         --config=/var/vcap/packages/elasticsearch17/config/elasticsearch.yml
+         --XX:HeapDumpPath=${TMPDIR}/heap-dump/ \
+         <%= p("elasticsearch.exec.options", []).join(' ') %> \
+         >>$LOG_DIR/$JOB_NAME.stdout.log \
+         2>>$LOG_DIR/$JOB_NAME.stderr.log
+    ;;
+
+  stop)
+    kill_and_wait $PIDFILE
+
+    ;;
+  *)
+    echo "Usage: elasticsearch_ctl {start|stop}"
+
+    ;;
+
+esac
+exit 0
+----
++
+. Create a monit script for elasticsearch
++
+----
+
+
+Note that because this was built to be a somewhat "real" release vs. just a lab, that 
+this job is more complex than might be necessary for simple install of Elasticsearch.  
+
