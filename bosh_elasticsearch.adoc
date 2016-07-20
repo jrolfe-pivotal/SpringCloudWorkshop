@@ -51,7 +51,8 @@ files:
 - java8/OpenJDK-1.8.0.92-x86_64-bin.tar.xz
 ----
 +
-. Create the packaging script for java8
+. Edit the java8 packaging script
++
 ----
 # abort script on any command that exits with a non zero value
 set -e
