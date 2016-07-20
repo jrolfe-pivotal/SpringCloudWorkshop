@@ -174,9 +174,124 @@ esac
 exit 0
 ----
 +
-. Create a monit script for elasticsearch
+. Edit the elasticsearch17 job's monit file
 +
 ----
+check process elasticsearch
+  with pidfile /var/vcap/sys/run/elasticsearch17/elasticsearch17.pid
+  start program "/var/vcap/jobs/elasticsearch17/bin/elasticsearch_ctl start" with timeout 120 seconds
+  stop program "/var/vcap/jobs/elasticsearch17/bin/elasticsearch_ctl stop"
+  group vcap
+----
++
+. Edit the elasticsearch17 job's spec file
+
+Note that this spec file is more complex than might be necessary for a example lab, as I was trying to build a semi-real elasticsearch deployment.  It includes many property definitions to allow for a slightly more sophisticated ability to customize the elasticsearch deployment.
++
+----
+---
+name: elasticsearch17
+packages:
+- java8
+- elasticsearch17
+templates:
+  bin/elasticsearch_ctl: bin/elasticsearch_ctl
+  config/config.yml.erb: config/elasticsearch.yml
+  config/logging.yml.erb: config/logging.yml
+  config/custom/catalog/synonyms.txt: config/custom/catalog/synonyms.txt
+  config/custom/catalog/dimensions.txt: config/custom/catalog/dimensions.txt
+  data/properties.sh.erb: data/properties.sh
+  helpers/ctl_setup.sh: helpers/ctl_setup.sh
+  helpers/ctl_utils.sh: helpers/ctl_utils.sh
+properties:
+  elasticsearch.drain:
+    description: Whether to use the built-in drain features to improve deployment reliability
+    # disabled while we do additional testing
+    default: false
+  elasticsearch.master_hosts:
+    description: The list of elasticsearch master node IPs
+  elasticsearch.cluster_name:
+    description: The name of the elastic search cluster
+  elasticsearch.log_level:
+    description: The default logging level (e.g. WARN, DEBUG, INFO)
+    default: INFO
+  elasticsearch.node.allow_master:
+    description: Allow node to become master? (true / false)
+    default: false
+  elasticsearch.node.allow_data:
+    description: Allow node to store data? (true / false)
+    default: false
+  elasticsearch.node.tags:
+    description: A hash of additional tags for the node
+  elasticsearch.exec.environment:
+    description: A hash of additional environment variables for the process
+  elasticsearch.exec.options:
+    description: An array of additional options to pass when starting elasticsearch
+    default: []
+  elasticsearch.discovery.minimum_master_nodes:
+    description: The minimum number of master eligible nodes a node should "see" in order to operate within the cluster. Recommended to set it to a higher value than 1 when running more than 2 nodes in the cluster.
+    default: 1
+  elasticsearch.config_options:
+    description: "Additional options to append to elasticsearch's config.yml (YAML format)."
+    default: ~
+  elasticsearch.logging_options:
+    description: "Additional options to append to elasticsearch's logging.yml (YAML format)."
+    default: ~
+  elasticsearch.plugins:
+    description: "Plugins to run elasticsearch with (array[] = { plugin-name: install-source }; e.g. [ { kopf: 'lmenezes/elasticsearch-kopf' } ])"
+    default: []
+  elasticsearch.http_host:
+    description: "The host address to bind the elasticsearch HTTP service to and to publish for HTTP clients to connect to"
+    default: 0.0.0.0
+----
++
+. Create a subdirectory called `config` in the job's template directory, and create a new template called `config.yml.erb`
++
+----
+bootstrap.mlockall: true
+
+path.conf: "/var/vcap/jobs/elasticsearch17/config"
+path.logs: "/var/vcap/sys/log/elasticsearch17"
+path.data: "/var/vcap/store/elasticsearch17"
+path.scripts: "/var/vcap/data/elasticsearch17/plugin-scripts"
+
+cluster.name: "<%= p("elasticsearch.cluster_name") %>"
+
+node.max_local_storage_nodes: 1
+node.name: "<%= name %>/<%= index %>"
+node.master: <%= p("elasticsearch.node.allow_master") %>
+node.data: <%= p("elasticsearch.node.allow_data") %>
+node.job_name: "<%= name %>"
+node.job_index: "<%= index %>"
+<% p("elasticsearch.node.tags", {}).each do | k, v | %>
+node.<%= k %>: "<%= v %>"
+<% end %>
+
+network.host: "0.0.0.0"
+http.host: <%= p("elasticsearch.http_host") %>
+
+discovery.zen.minimum_master_nodes: <%= p("elasticsearch.discovery.minimum_master_nodes") %>
+discovery.zen.ping.multicast.enabled: false
+discovery.zen.ping.unicast.hosts: "<%= p("elasticsearch.master_hosts").join(',') %>"
+
+<% if_p('elasticsearch.config_options') do | v | %><%= v %><% end %>
+----
++
+. Create another template called `logging.yml.erb`
++
+----
+rootLogger: "<%= p("elasticsearch.log_level") %>, console"
+
+appender:
+  console:
+    type: "console"
+    layout:
+      type: "consolePattern"
+      conversionPattern: "[%d{ISO8601}][%-5p][%-25c] %m%n"
+
+<% if_p('elasticsearch.logging_options') do | v | %><%= v %><% end %>
+----
+
 
 
 Note that because this was built to be a somewhat "real" release vs. just a lab, that 
